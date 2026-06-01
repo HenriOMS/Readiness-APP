@@ -28,7 +28,7 @@ services:
     restart: always
     ports:
       - "8000:8000"
-    # Injecte le fichier .env dans le conteneur (sera lu par notre config.py / Pydantic)
+    # Injecte le fichier .env dans le conteneur
     env_file:
       - .env
     depends_on:
@@ -39,11 +39,13 @@ services:
   frontend:
     build:
       context: ./Front_end
-      dockerfile: dockerfile
+      dockerfile: dockerfile # (Attention à la casse de la première lettre, parfois Dockerfile avec majuscule est requis selon ton OS)
     container_name: readiness_streamlit_frontend
     restart: always
     ports:
       - "8501:8501"
+    environment:
+      - API_URL=http://backend:8000  # <--- LA LIGNE MAGIQUE EST ICI
     depends_on:
       - backend
 

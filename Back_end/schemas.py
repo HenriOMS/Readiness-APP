@@ -35,14 +35,33 @@ class UserCreate(BaseModel):
     notification_time: Optional[time] = time(8, 0)
     primary_sport: str
 
-# Format de réponse envoyé au client (on ne renvoie jamais le mot de passe)
+## Format de réponse complet envoyé au client
 class UserResponse(BaseModel):
     id: int
     email: str
     firstname: str
+    lastname: str
+    weight: float
+    height: int
+    address: str
+    city: str
+    country: str
+    primary_sport: Optional[str] = None
     
     class Config:
         from_attributes = True
+
+# Données autorisées pour la mise à jour du profil
+class UserUpdate(BaseModel):
+    password: Optional[str] = None
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    weight: Optional[float] = None
+    height: Optional[int] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    primary_sport: Optional[str] = None
 
 #-------------------------------------------------------------------------------
 # MÉTRIQUES QUOTIDIENNES (CHECK-IN)

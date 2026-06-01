@@ -10,31 +10,37 @@ from datetime import date
 # Configuration de la page (doit être la première commande Streamlit)
 st.set_page_config(page_title="Readiness APP", page_icon="⚡", layout="centered")
 
-# Injection de CSS personnalisé pour une interface moderne et épurée
+# Injection de CSS personnalisé pour une meilleure interface 
 st.markdown("""
     <style>
-    h1, h2, h3 { font-family: 'Helvetica Neue', sans-serif; font-weight: 800 !important; letter-spacing: -0.5px; }
-    div[data-testid="stMetricValue"] { color: #00D2D3 !important; font-weight: 900; font-size: 2.5rem !important; }
+    h1, h2, h3 { font-weight: 800 !important; letter-spacing: -0.5px; }
+    
+    div[data-testid="stMetricValue"] { color: #00D2D3 !important; font-weight: 900; font-size: 1.8rem !important; }
+    
     div.stButton > button { border-radius: 6px; font-weight: bold; transition: all 0.2s ease-in-out; }
     div.stButton > button:hover { transform: scale(1.02); box-shadow: 0 4px 12px rgba(0, 210, 211, 0.3); }
+    
+    div[data-testid="stTabs"] button p {
+        font-size: 1.1rem !important; 
+        font-weight: 700 !important;
+    }
+    
+    input::placeholder {
+        color: #FFFFFF !important;
+        opacity: 1 !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# 1. On cherche d'abord la variable d'environnement (Render)
+# 1. Configuration de l'URL de l'API
 API_URL = os.getenv("API_URL")
-
-# 2. Si on ne trouve rien sur Render, on cherche dans les secrets Streamlit sans faire planter l'app
 if not API_URL:
     try:
         API_URL = st.secrets.get("API_URL")
     except Exception:
         API_URL = None
-
-# 3. Si on n'a toujours rien (cas du test local), on met localhost
 if not API_URL:
     API_URL = "http://localhost:8000"
-
-# Nettoyage de l'URL
 API_URL = API_URL.rstrip("/")
 
 SPORTS_LIST = ["Cyclisme", "Course à pied", "Natation", "Trail", "Triathlon", "Musculation", "Tennis", "Autre"]
@@ -50,9 +56,13 @@ if "garmin_linked" not in st.session_state: st.session_state.garmin_linked = Fal
 if "needs_review" not in st.session_state: st.session_state.needs_review = []
 
 def logout():
-    """Réinitialise totalement la session utilisateur"""
-    for key in list(st.session_state.keys()): del st.session_state[key]
-    st.rerun()
+    """Réinitialise la session utilisateur proprement sans casser les widgets Streamlit"""
+    st.session_state.token = None
+    st.session_state.user_id = None
+    st.session_state.edit_mode = False
+    st.session_state.auth_mode = "login"
+    st.session_state.garmin_linked = False
+    st.session_state.needs_review = []
 
 #-------------------------------------------------------------------------------
 # 1. INTERFACE D'AUTHENTIFICATION (LOGIN / REGISTER)
@@ -60,14 +70,14 @@ def logout():
 if not st.session_state.token:
     st.markdown("<h1 style='text-align: center; margin-bottom: 2rem;'>⚡ Readiness APP</h1>", unsafe_allow_html=True)
     
-    # Formulaire de Connexion
     if st.session_state.auth_mode == "login":
         st.subheader("Connexion")
         with st.form("login_form"):
             login_email = st.text_input("Email")
             login_password = st.text_input("Mot de passe", type="password")
             if st.form_submit_button("Connexion", use_container_width=True):
-                res = requests.post(f"{API_URL}/users/login", data={"username": login_email, "password": login_password})
+                with st.spinner("Authentification en cours..."):
+                    res = requests.post(f"{API_URL}/users/login", data={"username": login_email, "password": login_password})
                 if res.status_code == 200:
                     data = res.json()
                     st.session_state.token = data["access_token"]
@@ -80,7 +90,6 @@ if not st.session_state.token:
         if st.button("Créer un profil athlète", use_container_width=True):
             st.session_state.auth_mode = "register"; st.rerun()
             
-    # Formulaire d'Inscription
     elif st.session_state.auth_mode == "register":
         st.subheader("Nouveau profil athlète")
         with st.form("register_form"):
@@ -115,6 +124,13 @@ if not st.session_state.token:
 # 2. DASHBOARD PRINCIPAL (UTILISATEUR CONNECTÉ)
 #-------------------------------------------------------------------------------
 else:
+    # --- EN-TÊTE AVEC BOUTON DÉCONNEXION EN HAUT À DROITE ---
+    header_col1, header_col2 = st.columns([4, 1])
+    with header_col1:
+        st.markdown("<h2 style='margin-bottom: 0px;'>⚡ Readiness APP</h2>", unsafe_allow_html=True)
+    with header_col2:
+        st.button("Déconnexion", on_click=logout, use_container_width=True)
+
     # Rappel subjectif des séances importées de Garmin sans RPE/Sensation
     if st.session_state.needs_review:
         st.warning("🎯 **Analyse de séance nécessaire**")
@@ -134,7 +150,7 @@ else:
         st.divider()
 
     # Organisation du Dashboard en onglets
-    tab_home, tab_trends, tab_settings = st.tabs(["🏠 Accueil", "📈 Historique des données", "⚙️ Paramètres"])
+    tab_home, tab_trends, tab_settings = st.tabs(["🏠 Accueil", "📈 Historique", "⚙️ Paramètres"])
 
     # --- ONGLET ACCUEIL (CHECK-IN) ---
     with tab_home:
@@ -189,7 +205,7 @@ else:
             if hist_res.status_code == 200 and hist_res.json():
                 df = pd.DataFrame(hist_res.json())
                 df['date'] = pd.to_datetime(df['date'])
-                metrics = {"🌟 Score de Wellness": "wellness_score", "💤 Sommeil (h)": "sleep_duration", "🔋 Fatigue": "fatigue_level", "🧠 Stress": "mental_stress"}
+                metrics = {"🌟 Score de Bien-être": "wellness_score", "💤 Sommeil (h)": "sleep_duration", "🔋 Fatigue": "fatigue_level", "🧠 Stress": "mental_stress"}
                 sel_col = metrics[st.selectbox("Indicateur à visualiser", list(metrics.keys()))]
                 st.bar_chart(df.set_index('date')[sel_col], color="#00D2D3")
             else: st.info("Historique vide.")
@@ -204,25 +220,86 @@ else:
     # --- ONGLET PARAMÈTRES & GARMIN ---
     with tab_settings:
         st.title("Réglages")
-        st.subheader("Connexion Garmin Connect™")
+        
+        # Section Modification de Profil
+        st.subheader("👤 Mes informations de profil")
+        
+        # On récupère les infos actuelles depuis la BDD
+        user_info = {}
+        info_res = requests.get(f"{API_URL}/users/{st.session_state.user_id}")
+        if info_res.status_code == 200:
+            user_info = info_res.json()
+
+        with st.form("update_profile_form"):
+            st.info("💡 Laissez les champs vides si vous ne souhaitez pas les modifier.")
+            
+            c1, c2 = st.columns(2)
+            upd_firstname = c1.text_input("Prénom", placeholder=str(user_info.get("firstname", "")))
+            upd_lastname = c2.text_input("Nom", placeholder=str(user_info.get("lastname", "")))
+            
+            upd_password = st.text_input("Nouveau mot de passe", type="password", placeholder="••••••••")
+            
+            c3, c4 = st.columns(2)
+            upd_weight = c3.number_input("Poids (kg)", value=None, placeholder=str(user_info.get("weight", "")))
+            upd_height = c4.number_input("Taille (cm)", value=None, placeholder=str(user_info.get("height", "")))
+            
+            upd_address = st.text_input("Adresse postale", placeholder=str(user_info.get("address", "")))
+            
+            c5, c6 = st.columns(2)
+            upd_city = c5.text_input("Ville", placeholder=str(user_info.get("city", "")))
+            upd_country = c6.text_input("Pays", placeholder=str(user_info.get("country", "")))
+            
+            existing_sports_str = user_info.get("primary_sport", "")
+            if existing_sports_str and existing_sports_str != "Non renseigné":
+                existing_sports_list = [s.strip() for s in existing_sports_str.split(",") if s.strip() in SPORTS_LIST]
+            else:
+                existing_sports_list = []
+                
+            upd_sports = st.multiselect("Sports pratiqués", SPORTS_LIST, default=existing_sports_list)
+
+            if st.form_submit_button("Mettre à jour mon profil"):
+                sports_str = ", ".join(upd_sports) if upd_sports else "Non renseigné"
+                
+                payload = {k: v for k, v in {
+                    "firstname": upd_firstname,
+                    "lastname": upd_lastname,
+                    "password": upd_password,
+                    "weight": upd_weight,
+                    "height": upd_height,
+                    "address": upd_address,
+                    "city": upd_city,
+                    "country": upd_country,
+                    "primary_sport": sports_str
+                }.items() if v is not None and v != ""}
+                
+                if payload:
+                    with st.spinner("Mise à jour en cours..."):
+                        update_res = requests.patch(f"{API_URL}/users/{st.session_state.user_id}", json=payload)
+                    if update_res.status_code == 200:
+                        st.success("✅ Profil mis à jour avec succès !")
+                        st.rerun()
+                    else:
+                        st.error("Erreur lors de la mise à jour.")
+                else:
+                    st.warning("Aucune modification n'a été saisie.")
+        st.divider()
+
+        # Section Garmin
+        st.subheader("⌚ Connexion Garmin Connect™")
         if st.session_state.garmin_linked:
             st.success("✅ Compte Garmin synchronisé")
             if st.button("Déconnecter Garmin"): st.session_state.garmin_linked = False; st.rerun()
+            
+            if st.button("🔄 Synchroniser mes activités", use_container_width=True):
+                with st.spinner("Importation des données..."):
+                    sync_res = requests.post(f"{API_URL}/sync/activities/{st.session_state.user_id}")
+                    if sync_res.status_code == 200:
+                        st.session_state.needs_review = sync_res.json().get("needs_review", [])
+                        st.rerun() if st.session_state.needs_review else st.success("✅ À jour !")
+                    else: st.error("Erreur de synchro.")
         else:
             with st.form("garmin_form"):
                 g_email, g_pwd = st.text_input("Email Garmin"), st.text_input("Mot de passe", type="password")
                 if st.form_submit_button("Lier ma montre"):
                     if requests.post(f"{API_URL}/users/garmin/connect", json={"user_id": st.session_state.user_id, "garmin_email": g_email, "garmin_password": g_pwd}).status_code == 200:
                         st.session_state.garmin_linked = True; st.rerun()
-        
-        st.divider()
-        if st.button("🔄 Synchroniser mes activités", use_container_width=True):
-            with st.spinner("Importation des données..."):
-                sync_res = requests.post(f"{API_URL}/sync/activities/{st.session_state.user_id}")
-                if sync_res.status_code == 200:
-                    st.session_state.needs_review = sync_res.json().get("needs_review", [])
-                    st.rerun() if st.session_state.needs_review else st.success("✅ À jour !")
-                else: st.error("Erreur de synchro.")
-                    
-        st.divider()
-        st.button("Se déconnecter", type="primary", on_click=logout, use_container_width=True)

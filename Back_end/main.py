@@ -103,6 +103,30 @@ def login_for_access_token(db: Session = Depends(get_db), form_data: OAuth2Passw
     )
     return {"access_token": access_token, "token_type": "bearer", "user_id": user.id}
 
+# Récupère toutes les informations du profil de l'utilisateur
+@app.get("/users/{user_id}", response_model=schemas.UserResponse)
+def get_user_profile(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user: raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    return user
+
+# Met à jour le profil (et hache le mot de passe s'il est modifié)
+@app.patch("/users/{user_id}", response_model=schemas.UserResponse)
+def update_user_profile(user_id: int, user_update: schemas.UserUpdate, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user: raise HTTPException(status_code=404)
+    
+    update_data = user_update.model_dump(exclude_unset=True)
+    
+    # Si l'utilisateur change son mot de passe, on le sécurise avant de le sauvegarder
+    if "password" in update_data:
+        update_data["hashed_password"] = security.get_password_hash(update_data.pop("password"))
+        
+    for key, value in update_data.items():
+        setattr(db_user, key, value)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
 #-------------------------------------------------------------------------------
 # CONNEXION ET STATUT GARMIN
 #-------------------------------------------------------------------------------
