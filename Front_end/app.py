@@ -20,7 +20,23 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-API_URL = os.getenv("API_URL", st.secrets.get("API_URL", "http://localhost:8000"))
+# 1. On cherche d'abord la variable d'environnement (Render)
+API_URL = os.getenv("API_URL")
+
+# 2. Si on ne trouve rien sur Render, on cherche dans les secrets Streamlit sans faire planter l'app
+if not API_URL:
+    try:
+        API_URL = st.secrets.get("API_URL")
+    except Exception:
+        API_URL = None
+
+# 3. Si on n'a toujours rien (cas du test local), on met localhost
+if not API_URL:
+    API_URL = "http://localhost:8000"
+
+# Nettoyage de l'URL
+API_URL = API_URL.rstrip("/")
+
 SPORTS_LIST = ["Cyclisme", "Course à pied", "Natation", "Trail", "Triathlon", "Musculation", "Tennis", "Autre"]
 
 #-------------------------------------------------------------------------------
