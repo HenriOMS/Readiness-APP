@@ -2,6 +2,7 @@
 # CONFIGURATION ET STYLE DE L'APPLICATION
 #-------------------------------------------------------------------------------
 import streamlit as st
+import os
 import requests
 import pandas as pd
 from datetime import date
@@ -19,7 +20,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-API_URL = "http://backend:8000"
+API_URL = os.getenv("API_URL", st.secrets.get("API_URL", "http://localhost:8000"))
 SPORTS_LIST = ["Cyclisme", "Course à pied", "Natation", "Trail", "Triathlon", "Musculation", "Tennis", "Autre"]
 
 #-------------------------------------------------------------------------------
