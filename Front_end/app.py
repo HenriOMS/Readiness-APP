@@ -142,7 +142,7 @@ else:
                         val = col.select_slider(muscle, options=[0,1,2,3,4,5], value=0, key=f"s_{muscle}")
                         if val > 0: soreness_data[muscle] = val
 
-                if st.form_submit_button("Calculer ma Readiness", use_container_width=True):
+                if st.form_submit_button("Envoyer mon rapport", use_container_width=True):
                     payload = {
                         "user_id": st.session_state.user_id, "sleep_quality": sq, "sleep_duration": sd,
                         "fatigue_level": fatigue, "motivation_level": motivation, "mental_stress": stress, 
