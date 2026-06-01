@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Base de données PostgreSQL
+  db:
+    image: postgres:16-alpine
+    container_name: readiness_postgres_db
+    restart: always
+  
+    env_file:
+      - .env
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U readiness_app_admin -d readiness_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Back-end FastAPI
+  backend:
+    build:
+      context: ./Back_end
+      dockerfile: Dockerfile
+    container_name: readiness_fastapi_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    # Injecte le fichier .env dans le conteneur (sera lu par notre config.py / Pydantic)
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Front-end Streamlit
+  frontend:
+    build:
+      context: ./Front_end
+      dockerfile: dockerfile
+    container_name: readiness_streamlit_frontend
+    restart: always
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
